@@ -5,7 +5,6 @@ import org.glassfish.tyrus.client.ClientManager;
 import org.glassfish.tyrus.server.Server;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import websockets.web.ElizaServerEndpoint;
 
@@ -26,50 +25,64 @@ public class ElizaServerTest {
 
     private static final Logger LOGGER = Grizzly.logger(ElizaServerTest.class);
 
-	private Server server;
+    private Server server;
 
-	@Before
-	public void setup() throws DeploymentException {
-		server = new Server("localhost", 8025, "/websockets",
-            new HashMap<>(), ElizaServerEndpoint.class);
-		server.start();
-	}
+    @Before
+    public void setup() throws DeploymentException {
+        server = new Server("localhost", 8025, "/websockets", new HashMap<>(), ElizaServerEndpoint.class);
+        server.start();
+    }
 
-	@Test(timeout = 5000)
-	public void onOpen() throws DeploymentException, IOException, URISyntaxException, InterruptedException {
-		CountDownLatch latch = new CountDownLatch(3);
-		List<String> list = new ArrayList<>();
-		ClientEndpointConfig configuration = ClientEndpointConfig.Builder.create().build();
-		ClientManager client = ClientManager.createClient();
-		Session session = client.connectToServer(new Endpoint() {
+    @Test(timeout = 5000)
+    public void onOpen() throws DeploymentException, IOException, URISyntaxException, InterruptedException {
+        CountDownLatch latch = new CountDownLatch(3);
+        List<String> list = new ArrayList<>();
+        ClientEndpointConfig configuration = ClientEndpointConfig.Builder.create().build();
+        ClientManager client = ClientManager.createClient();
+        Session session = client.connectToServer(new Endpoint() {
 
-			@Override
-			public void onOpen(Session session, EndpointConfig config) {
-				session.addMessageHandler(new ElizaOnOpenMessageHandler(list, latch));
-			}
+            @Override
+            public void onOpen(Session session, EndpointConfig config) {
+                session.addMessageHandler(new ElizaOnOpenMessageHandler(list, latch));
+            }
 
-		}, configuration, new URI("ws://localhost:8025/websockets/eliza"));
+        }, configuration, new URI("ws://localhost:8025/websockets/eliza"));
         session.getAsyncRemote().sendText("bye");
         latch.await();
-		assertEquals(3, list.size());
-		assertEquals("The doctor is in.", list.get(0));
-	}
+        assertEquals(3, list.size());
+        assertEquals("The doctor is in.", list.get(0));
+    }
 
-	@Test(timeout = 1000)
-	@Ignore
-	public void onChat() throws DeploymentException, IOException, URISyntaxException, InterruptedException {
-		// COMPLETE ME!!
-		List<String> list = new ArrayList<>();
-		ClientEndpointConfig configuration = ClientEndpointConfig.Builder.create().build();
-		ClientManager client = ClientManager.createClient();
-		client.connectToServer(new ElizaEndpointToComplete(list), configuration, new URI("ws://localhost:8025/websockets/eliza"));
-		// COMPLETE ME!!
-	}
+    @Test(timeout = 1000)
+    public void onChat() throws DeploymentException, IOException, URISyntaxException, InterruptedException {
+        List<String> list = new ArrayList<>();
+        ClientEndpointConfig configuration = ClientEndpointConfig.Builder.create().build();
+        ClientManager client = ClientManager.createClient();
+        Session session = client.connectToServer(new ElizaEndpointToComplete(list), configuration,
+                new URI("ws://localhost:8025/websockets/eliza"));
 
-	@After
-	public void close() {
-		server.stop();
-	}
+        // Check initial list size
+        assertEquals(0, list.size());
+        // Send message
+        session.getAsyncRemote().sendText("I think I need help");
+
+        Thread.sleep(100);
+        // Check list size after message
+        assertEquals(5, list.size());
+        // Check correct reply
+        assertEquals("The doctor is in.", list.get(0));
+        assertEquals("What's on your mind?", list.get(1));
+        assertEquals("---", list.get(2));
+        // Check client receives a DOCTOR question
+        assertEquals("Do you really think so?", list.get(3));
+        assertEquals("---", list.get(4));
+
+    }
+
+    @After
+    public void close() {
+        server.stop();
+    }
 
     private static class ElizaOnOpenMessageHandler implements MessageHandler.Whole<String> {
 
@@ -100,8 +113,6 @@ public class ElizaServerTest {
         @Override
         public void onOpen(Session session, EndpointConfig config) {
 
-            // COMPLETE ME!!!
-
             session.addMessageHandler(new ElizaMessageHandlerToComplete());
         }
 
@@ -110,7 +121,6 @@ public class ElizaServerTest {
             @Override
             public void onMessage(String message) {
                 list.add(message);
-                // COMPLETE ME!!!
             }
         }
     }
